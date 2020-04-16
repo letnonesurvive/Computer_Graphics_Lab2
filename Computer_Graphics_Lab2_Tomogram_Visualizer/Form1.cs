@@ -24,22 +24,22 @@ namespace Computer_Graphics_Lab2_Tomogram_Visualizer
         bool loaded = false;
         int currentLayer=0;
 
-        int FrameCount;
+        int FrameCount;//счетчик кадров
         DateTime NextFPSUpdate = DateTime.Now.AddSeconds(1);
 
         bool needReload = false;
 
-        internal class Bin
+        internal class Bin // томограмма сохранена в бинарном файле, по этому обработкой файла занимается данный класс
         {
-            public static int X, Y, Z;
-            public static short[] array;
+            public static int X, Y, Z; 
+            public static short[] array;// основной массив
             public Bin() { }
 
-            public void readBin(string path)
+            public void readBin(string path)//передаем путь
             {
-                if (File.Exists(path))
+                if (File.Exists(path))//если файл с таким путем существует
                 {
-                    BinaryReader reader = new BinaryReader(File.Open(path, FileMode.Open));
+                    BinaryReader reader = new BinaryReader(File.Open(path, FileMode.Open));// объект способный читать бинарный файл
 
                     X = reader.ReadInt32();
                     Y = reader.ReadInt32();
@@ -50,13 +50,13 @@ namespace Computer_Graphics_Lab2_Tomogram_Visualizer
                     array = new short[arraySize];
                     for (int i = 0; i < arraySize; i++)
                     {
-                        array[i] = reader.ReadInt16();
+                        array[i] = reader.ReadInt16();//записываем числа из данного файла
                     }
                 }
             }
         }
 
-        void DisplayFPS()
+        void DisplayFPS()//выводит фпс на экран
         {
             if(DateTime.Now>=NextFPSUpdate)
             {
@@ -67,7 +67,7 @@ namespace Computer_Graphics_Lab2_Tomogram_Visualizer
             FrameCount++;
         }
 
-        public static int Clamp(int value, int min, int max)
+        public static int Clamp(int value, int min, int max)//функция как в предыдущей лабе
         {
             if (value > max)
                 return max;
@@ -75,30 +75,37 @@ namespace Computer_Graphics_Lab2_Tomogram_Visualizer
                 return min;
             return value;
         }
-       
-        private void Button1_Click(object sender, EventArgs e)
+        static Color TransferFuncltion(short value)//функция перевода значения плотностей томограммы в цвет
+        {
+            int min = 0;
+            int max = 2000;
+            int newVal = Clamp((value - min) * 255 / (max - min), 0, 255);//переводил плотность окна визуализации от 0 до 2000 линейно в цвет от черного до белого (от 0 до 255).
+            return Color.FromArgb(255, newVal, newVal, newVal);
+        }
+
+        private void Button1_Click(object sender, EventArgs e)//по кнопке открывается файл 
         {
             OpenFileDialog dialog = new OpenFileDialog();
             if(dialog.ShowDialog()==DialogResult.OK)
             {
                 string str = dialog.FileName;
                 bin.readBin(str);
-                view.SetupView(glControl1.Width, glControl1.Height);
+                view.SetupView(glControl1.Width, glControl1.Height);// передаем окно OpenGL
                 loaded = true;
                 glControl1.Invalidate();
-                trackBar1.Maximum = Bin.Z-1;
+                trackBar1.Maximum = Bin.Z-1;//число деление соответствует числу слоев томограммы
             }
         }
 
         private void GlControl1_Paint(object sender, PaintEventArgs e)
         {
-            if(loaded)
+            if(loaded)//отрисовываем только когда данные загружены
             {
-                if (radioButton1.Checked)
+                if (radioButton1.Checked)//отрисовка четырехугольниками
                     view.DrawQuads(currentLayer);
                 else
                 {
-                    if (needReload)
+                    if (needReload)//отрисовка текстурой, текстура накладывается билинейной интерполяцией
                     {
                         view.generateTextureImage(currentLayer);
                         view.Load2DTexture();
@@ -106,34 +113,34 @@ namespace Computer_Graphics_Lab2_Tomogram_Visualizer
                     }
                     view.DrawTexture();
                 }
-                glControl1.SwapBuffers();
+                glControl1.SwapBuffers();//функция SwapBuffers загружает наш буфер в буфер экрана
             }
         }
         private void TrackBar1_Scroll(object sender, EventArgs e)
         {
-            currentLayer = trackBar1.Value;
-            needReload = true;
+            currentLayer = trackBar1.Value;//переключаем слои с помощью трекбара
+            needReload = true;//Переменную needReload необходимо устанавливать в значение true тогда,когда мы изменяем trackbar.
         }
-        void Application_Idle(object sender, EventArgs e)
+        void Application_Idle(object sender, EventArgs e)//проверяет, занято ли OpenGL окно работой
         {
             while(glControl1.IsIdle)
             {
                 DisplayFPS();
-                glControl1.Invalidate();
+                glControl1.Invalidate();//заставляет кадр рендариться заново
             }
         }
 
-        private void Form1_Load(object sender, EventArgs e)
+        private void Form1_Load(object sender, EventArgs e)//Чтобы функция Application_Idle работала автоматически
         {
             Application.Idle += Application_Idle;
         }
-        internal class View
+        internal class View // содержит функции для визуализации томограммы
         {
             Bitmap textureImage;
-            int VBOtexture;
+            int VBOtexture;//хранит номер текстуры в памяти
             public void Load2DTexture()
             {
-                GL.BindTexture(TextureTarget.Texture2D, VBOtexture);
+                GL.BindTexture(TextureTarget.Texture2D, VBOtexture);//связывает текстурку, делает ее активной
                 BitmapData data = textureImage.LockBits(
                     new Rectangle(0, 0, textureImage.Width, textureImage.Height),
                     ImageLockMode.ReadOnly,
@@ -141,7 +148,7 @@ namespace Computer_Graphics_Lab2_Tomogram_Visualizer
 
                 GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba,
                     data.Width, data.Height, 0, OpenTK.Graphics.OpenGL.PixelFormat.Bgra,
-                    PixelType.UnsignedByte, data.Scan0);
+                    PixelType.UnsignedByte, data.Scan0);//загружает текстуру в память видеокарты
 
                 textureImage.UnlockBits(data);
 
@@ -153,7 +160,7 @@ namespace Computer_Graphics_Lab2_Tomogram_Visualizer
                 ErrorCode Er = GL.GetError();
                 string str = Er.ToString();
             }
-            public void generateTextureImage(int layerNumber)
+            public void generateTextureImage(int layerNumber)//генерировать изображение из томограммы
             {
                 textureImage = new Bitmap(Bin.X, Bin.Y);
                 for (int i = 0; i < Bin.X; i++)
@@ -165,7 +172,7 @@ namespace Computer_Graphics_Lab2_Tomogram_Visualizer
                     }
                 }
             }
-            public void DrawTexture()
+            public void DrawTexture()//выбирает текстуру и рисует один прямоугольник с наложенное текстурой 
             {
                 GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
                 GL.Enable(EnableCap.Texture2D);
@@ -185,24 +192,16 @@ namespace Computer_Graphics_Lab2_Tomogram_Visualizer
 
                 GL.Disable(EnableCap.Texture2D);
             }
-            public void SetupView(int width, int height)
+            public void SetupView(int width, int height) // настраивает окно вывода
             {
-                GL.ShadeModel(ShadingModel.Smooth);
-                GL.MatrixMode(MatrixMode.Projection);
-                GL.LoadIdentity();
-                GL.Ortho(0, Bin.X, 0, Bin.Y, -1, 1);
+                GL.ShadeModel(ShadingModel.Smooth);//интерполяция цветов
+                GL.MatrixMode(MatrixMode.Projection);//матрица проекции инициализируется
+                GL.LoadIdentity();//тождественное преобразование
+                GL.Ortho(0, Bin.X, 0, Bin.Y, -1, 1);//ортогональное проецирование массива данных томограммы в окно вывода
                 GL.Viewport(0, 0, width, height);
 
             }
-            Color TransferFuncltion(short value)
-            {
-                int min = 0;
-                int max = 2000;
-                int newVal = Clamp((value - min) * 255 / (max - min), 0, 255);
-                return Color.FromArgb(255, newVal, newVal, newVal);
-            }
-
-            public void DrawQuads(int layerNumber)
+            public void DrawQuads(int layerNumber)//этот метод рисует с помощью четырехугольников, подаем на вход номер слоя
             {
                 GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
                 GL.Begin(BeginMode.Quads);
@@ -212,18 +211,22 @@ namespace Computer_Graphics_Lab2_Tomogram_Visualizer
                     for (int y_coord = 0; y_coord < Bin.Y - 1; y_coord++)
                     {
                         short value;
+                        //1 вершина
                         value = Bin.array[x_coord + y_coord * Bin.X + layerNumber * Bin.X * Bin.Y];
                         GL.Color3(TransferFuncltion(value));
                         GL.Vertex2(x_coord, y_coord);
 
+                        //2 вершина
                         value = Bin.array[x_coord + (y_coord + 1) * Bin.X + layerNumber * Bin.X * Bin.Y];
                         GL.Color3(TransferFuncltion(value));
                         GL.Vertex2(x_coord, y_coord + 1);
 
+                        //3 вершина
                         value = Bin.array[x_coord + 1 + (y_coord + 1) * Bin.X + layerNumber * Bin.X * Bin.Y];
                         GL.Color3(TransferFuncltion(value));
                         GL.Vertex2(x_coord + 1, y_coord + 1);
 
+                        //4 вершина
                         value = Bin.array[x_coord + 1 + y_coord * Bin.X + layerNumber * Bin.X * Bin.Y];
                         GL.Color3(TransferFuncltion(value));
                         GL.Vertex2(x_coord + 1, y_coord);
